@@ -1,0 +1,87 @@
+rules:
+  # Détecte les requêtes SQL par concaténation
+  - id: sql-string-concatenation
+    patterns:
+      - pattern: |
+          `... WHERE ... ${...} ...`
+      - pattern-inside: |
+          $DB.prepare(...).get(...)
+    message: |
+      Possible SQL injection: requête construite par interpolation de template.
+      Utiliser des requêtes paramétrées avec ? à la place.
+    languages: [javascript, typescript]
+    severity: ERROR
+    metadata:
+      cwe: CWE-89
+      owasp: A03:2021
+
+  # Détecte dangerouslySetInnerHTML sans DOMPurify
+  - id: xss-dangerous-innerhtml
+    patterns:
+      - pattern: dangerouslySetInnerHTML={{ __html: $VAR }}
+      - pattern-not: dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize($VAR) }}
+    message: |
+      XSS potentiel: dangerouslySetInnerHTML utilisé sans DOMPurify.sanitize().
+      Sanitiser le contenu ou utiliser le rendu texte React standard.
+    languages: [javascript, typescript]
+    severity: WARNING
+    metadata:
+      cwe: CWE-79
+      owasp: A03:2021
+
+  # Détecte fetch() sans validation d'URL (SSRF)
+  - id: ssrf-unvalidated-fetch
+    patterns:
+      - pattern: fetch($URL, ...)
+      - pattern-not-inside: |
+          if (isUrlSafe($URL)) { ... }
+      - pattern-not: fetch("...", ...)
+    message: |
+      SSRF potentiel: fetch() appelé avec une URL dynamique sans validation.
+      Valider l'URL contre une liste blanche avant de l'utiliser.
+    languages: [javascript, typescript]
+    severity: WARNING
+    metadata:
+      cwe: CWE-918
+      owasp: A10:2021
+
+  # Détecte les mots de passe stockés en clair
+  - id: plaintext-password-storage
+    patterns:
+      - pattern: |
+          INSERT INTO users (..., password, ...) VALUES (..., $PWD, ...)
+      - pattern-not: |
+          INSERT INTO users (..., password, ...) VALUES (..., bcrypt.hash(...), ...)
+    message: |
+      Mot de passe stocké en clair en base de données.
+      Utiliser bcrypt ou argon2 pour hasher les mots de passe.
+    languages: [javascript, typescript]
+    severity: ERROR
+    metadata:
+      cwe: CWE-256
+      owasp: A02:2021
+
+  # Détecte les cookies sans HttpOnly
+  - id: cookie-missing-httponly
+    pattern: |
+      $RES.cookies.set($NAME, $VAL, { path: $P })
+    message: |
+      Cookie défini sans le flag httpOnly.
+      Ajouter httpOnly: true pour empêcher l'accès via JavaScript (protection XSS).
+    languages: [javascript, typescript]
+    severity: WARNING
+    metadata:
+      cwe: CWE-1004
+      owasp: A05:2021
+
+  # Détecte les stack traces exposées dans les réponses
+  - id: stack-trace-exposure
+    pattern: NextResponse.json({ ..., stack: $ERR.stack, ... }, ...)
+    message: |
+      Stack trace exposée dans la réponse HTTP.
+      Ne jamais inclure err.stack dans les réponses API en production.
+    languages: [javascript, typescript]
+    severity: WARNING
+    metadata:
+      cwe: CWE-209
+      owasp: A05:2021

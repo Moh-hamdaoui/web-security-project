@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Build
+.next/
+out/
+
+# Database
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# ⚠️  NOTE PÉDAGOGIQUE: dans un vrai projet, .env NE DOIT PAS être commité
+# On le commite ici intentionnellement pour la démonstration de VLN-05a
+# .env
+
+# Semgrep results (générés par CI)
+semgrep-results.json
+semgrep-sqli.json
+npm-audit-report.json
+
+# OS
+.DS_Store
+Thumbs.db
