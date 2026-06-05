@@ -13,14 +13,11 @@ export default function TicketDetailPage({ params }) {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
     const storedUser = localStorage.getItem("user");
-    if (!token) { router.push("/login"); return; }
-    if (storedUser) setUser(JSON.parse(storedUser));
+    if (!storedUser) { router.push("/login"); return; }
+    setUser(JSON.parse(storedUser));
 
-    fetch(`/api/tickets/${params.id}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    fetch(`/api/tickets/${params.id}`)
       .then((r) => r.json())
       .then((data) => {
         setTicket(data.ticket);
@@ -31,10 +28,9 @@ export default function TicketDetailPage({ params }) {
 
   async function submitComment(e) {
     e.preventDefault();
-    const token = localStorage.getItem("token");
     const res = await fetch(`/api/tickets/${params.id}/comments`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content: comment }),
     });
     const data = await res.json();
@@ -45,11 +41,7 @@ export default function TicketDetailPage({ params }) {
   }
 
   async function deleteTicket() {
-    const token = localStorage.getItem("token");
-    await fetch(`/api/tickets/${params.id}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    await fetch(`/api/tickets/${params.id}`, { method: "DELETE" });
     router.push("/dashboard");
   }
 

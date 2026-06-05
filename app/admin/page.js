@@ -10,16 +10,10 @@ export default function AdminPage() {
   const [stats, setStats] = useState({ open: 0, in_progress: 0, closed: 0 });
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
     const user = JSON.parse(localStorage.getItem("user") || "{}");
+    if (user.role !== "admin") { router.push("/dashboard"); return; }
 
-    // ⚠️  Vérification côté client uniquement — contournable
-    if (!token || user.role !== "admin") {
-      router.push("/dashboard");
-      return;
-    }
-
-    fetch("/api/tickets", { headers: { Authorization: `Bearer ${token}` } })
+    fetch("/api/tickets")
       .then((r) => r.json())
       .then((data) => {
         const t = data.tickets || [];

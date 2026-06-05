@@ -10,14 +10,10 @@ export default function NewTicketPage() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    const token = localStorage.getItem("token");
 
     const res = await fetch("/api/tickets", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
     });
 

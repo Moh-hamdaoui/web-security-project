@@ -16,10 +16,9 @@ export default function SSRFPage() {
     setResult(null);
     setError("");
 
-    const token = localStorage.getItem("token");
     const res = await fetch("/api/admin/fetch-url", {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url }),
     });
 

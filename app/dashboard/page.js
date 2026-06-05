@@ -24,12 +24,10 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) { router.push("/login"); return; }
+    // Auth check via localStorage user (non-sensible) — le cookie httpOnly gère l'auth réelle
+    if (!localStorage.getItem("user")) { router.push("/login"); return; }
 
-    fetch("/api/tickets", {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    fetch("/api/tickets")
       .then((r) => r.json())
       .then((data) => {
         setTickets(data.tickets || []);

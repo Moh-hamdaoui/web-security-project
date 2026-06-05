@@ -8,20 +8,18 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState([]);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
     const user = JSON.parse(localStorage.getItem("user") || "{}");
-    if (!token || user.role !== "admin") { router.push("/dashboard"); return; }
+    if (user.role !== "admin") { router.push("/dashboard"); return; }
 
-    fetch("/api/admin/users", { headers: { Authorization: `Bearer ${token}` } })
+    fetch("/api/admin/users")
       .then((r) => r.json())
       .then((data) => setUsers(data.users || []));
   }, []);
 
   async function deleteUser(id) {
-    const token = localStorage.getItem("token");
     await fetch("/api/admin/users", {
       method: "DELETE",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId: id }),
     });
     setUsers(users.filter((u) => u.id !== id));
