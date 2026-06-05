@@ -1,20 +1,20 @@
-name: Security Pipeline
+name: Security CI
 
 on:
   push:
-    branches: [main, develop]
+    branches:
+      - main
+      - secure-version
   pull_request:
-    branches: [main]
 
 jobs:
-  # ─────────────────────────────────────────
-  # 1. Audit des dépendances npm
-  # ─────────────────────────────────────────
-  dependency-audit:
-    name: Dependency Audit (npm audit)
+  security:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -25,150 +25,94 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run npm audit
-        run: npm audit --audit-level=moderate
-        continue-on-error: true  # La version vulnérable a des vulns connues
+      - name: SCA - npm audit
+        run: npm audit --audit-level=high
+        continue-on-error: true  # ⚠️  attendu : la version vulnérable a des CVE connus
 
-      - name: Generate audit report
-        run: npm audit --json > npm-audit-report.json || true
-
-      - name: Upload audit report
-        uses: actions/upload-artifact@v4
+      # ── 3. SAST — Semgrep ─────────────────────────────────────────────────
+      # Static Application Security Testing : analyse le code source
+      # Détecte : SQLi, XSS, SSRF, mauvaises configs JWT, stack traces exposées
+      - name: SAST - Semgrep
+        uses: semgrep/semgrep-action@v1
         with:
-          name: npm-audit-report
-          path: npm-audit-report.json
+          config: >-
+            p/owasp-top-ten
+            p/javascript
+            p/nodejs
+            p/jwt
+            p/sql-injection
+        continue-on-error: true  # ⚠️  attendu : vulnérabilités intentionnelles détectées
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
 
-  # ─────────────────────────────────────────
-  # 2. Analyse statique avec Semgrep
-  # ─────────────────────────────────────────
-  semgrep:
-    name: SAST — Semgrep
-    runs-on: ubuntu-latest
-    container:
-      image: semgrep/semgrep
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Run Semgrep (OWASP Top 10)
-        run: |
-          semgrep scan \
-            --config "p/owasp-top-ten" \
-            --config "p/javascript" \
-            --config "p/nodejs" \
-            --config "p/jwt" \
-            --json \
-            --output semgrep-results.json \
-            . || true
-
-      - name: Run Semgrep (SQLi)
-        run: |
-          semgrep scan \
-            --config "p/sql-injection" \
-            --json \
-            --output semgrep-sqli.json \
-            . || true
-
-      - name: Display findings summary
-        run: |
-          echo "=== Semgrep Findings ==="
-          cat semgrep-results.json | python3 -c "
-          import json, sys
-          data = json.load(sys.stdin)
-          results = data.get('results', [])
-          print(f'Total findings: {len(results)}')
-          for r in results[:10]:
-              print(f'  [{r[\"extra\"][\"severity\"]}] {r[\"check_id\"]} — {r[\"path\"]}:{r[\"start\"][\"line\"]}')
-          " || true
-
-      - name: Upload Semgrep results
-        uses: actions/upload-artifact@v4
-        with:
-          name: semgrep-results
-          path: |
-            semgrep-results.json
-            semgrep-sqli.json
-
-  # ─────────────────────────────────────────
-  # 3. Détection de secrets (Gitleaks)
-  # ─────────────────────────────────────────
-  secret-scan:
-    name: Secret Detection — Gitleaks
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Run Gitleaks
+      # ── 4. Secret Scan — Gitleaks ─────────────────────────────────────────
+      # Détecte les secrets commités : JWT_SECRET, clés API, mots de passe
+      # ⚠️  attendu : .env commité avec JWT_SECRET=secret123
+      - name: Secret Scan - Gitleaks
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
-        continue-on-error: true  # ⚠️  .env commité → détection attendue
+        continue-on-error: true  # ⚠️  attendu : secrets détectés dans .env
 
-  # ─────────────────────────────────────────
-  # 4. Analyse des headers HTTP (pour version corrigée)
-  # ─────────────────────────────────────────
-  security-headers:
-    name: Security Headers Check
-    runs-on: ubuntu-latest
-    needs: []
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-
-      - name: Install dependencies
-        run: npm ci
-
+      # ── 5. Build pour le DAST ─────────────────────────────────────────────
       - name: Build application
         run: npm run build
         env:
-          JWT_SECRET: ci-test-secret-not-real
+          JWT_SECRET: ${{ secrets.JWT_SECRET || 'ci-test-jwt-secret-32chars-minimum0' }}
           DATABASE_PATH: ./data/ci-test.db
 
-      - name: Start server and check headers
-        run: |
-          npm start &
-          sleep 5
-          echo "=== Checking security headers ==="
-          curl -s -I http://localhost:3000 | grep -E "(X-Frame-Options|Content-Security-Policy|X-Content-Type-Options|Strict-Transport-Security|Referrer-Policy)" || echo "MISSING security headers detected"
+      # ── 6. Initialiser la DB de test ──────────────────────────────────────
+      - name: Init test database
+        run: node scripts/init-db.js
         env:
-          JWT_SECRET: ci-test-secret-not-real
           DATABASE_PATH: ./data/ci-test.db
+
+      # ── 7. Démarrer l'application ─────────────────────────────────────────
+      - name: Start app
+        run: npm start &
+        env:
+          JWT_SECRET: ${{ secrets.JWT_SECRET || 'ci-test-jwt-secret-32chars-minimum0' }}
+          DATABASE_PATH: ./data/ci-test.db
+
+      # ── 8. Attendre que l'app soit prête ──────────────────────────────────
+      - name: Wait for app
+        run: npx wait-on http://localhost:3000 --timeout 30000
+
+      # ── 9. Tests applicatifs de sécurité ──────────────────────────────────
+      # Vérifient que chaque vulnérabilité est bien corrigée (ou bien présente sur main)
+      # - main          : continue-on-error=true  → informatif, ne bloque pas
+      # - secure-version: continue-on-error=false → bloquant si un test échoue
+      - name: Security Tests
+        run: node tests/security.test.mjs
+        env:
+          TEST_BASE_URL: http://localhost:3000
+        continue-on-error: ${{ github.ref_name == 'main' }}
+
+      # ── 10. DAST — OWASP ZAP Baseline ─────────────────────────────────────
+      # Dynamic Application Security Testing : attaque l'app en boîte noire
+      # Détecte : XSS reflété, headers manquants, infos sensibles exposées
+      - name: DAST - OWASP ZAP
+        uses: zaproxy/action-baseline@v0.12.0
+        with:
+          target: 'http://localhost:3000'
+          rules_file_name: '.zap/rules.tsv'
+          cmd_options: '-a'
+          fail_action: false  # ⚠️  ne pas bloquer le pipeline sur la version vulnérable
         continue-on-error: true
 
-  # ─────────────────────────────────────────
-  # 5. Rapport de sécurité consolidé
-  # ─────────────────────────────────────────
-  security-report:
-    name: Security Report
-    runs-on: ubuntu-latest
-    needs: [dependency-audit, semgrep, secret-scan]
-    if: always()
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-
-      - name: Generate consolidated report
-        run: |
-          echo "# Security Report — TicketApp Vulnérable" > security-report.md
-          echo "Date: $(date -u)" >> security-report.md
-          echo "" >> security-report.md
-          echo "## Résultats" >> security-report.md
-          echo "| Job | Statut |" >> security-report.md
-          echo "|-----|--------|" >> security-report.md
-          echo "| npm audit | ${{ needs.dependency-audit.result }} |" >> security-report.md
-          echo "| Semgrep SAST | ${{ needs.semgrep.result }} |" >> security-report.md
-          echo "| Gitleaks | ${{ needs.secret-scan.result }} |" >> security-report.md
-          cat security-report.md
-
-      - name: Upload consolidated report
+      # ── 10. Upload des rapports ────────────────────────────────────────────
+      - name: Upload ZAP report
         uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: security-report
-          path: security-report.md
+          name: zap-report
+          path: report_html.html
+
+      - name: Upload npm audit report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: npm-audit-report
+          path: npm-audit-report.json
+        continue-on-error: true

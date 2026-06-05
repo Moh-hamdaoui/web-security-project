@@ -11,9 +11,10 @@ data/
 *.db-shm
 *.db-wal
 
-# ⚠️  NOTE PÉDAGOGIQUE: dans un vrai projet, .env NE DOIT PAS être commité
-# On le commite ici intentionnellement pour la démonstration de VLN-05a
-# .env
+# Fichiers d'environnement — ne jamais commiter
+.env
+.env.local
+.env.production
 
 # Semgrep results (générés par CI)
 semgrep-results.json
