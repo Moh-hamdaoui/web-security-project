@@ -1,5 +1,6 @@
 // Script d'initialisation de la base de données (CommonJS standalone)
 const Database = require("better-sqlite3");
+const bcrypt = require("bcryptjs");
 const path = require("path");
 const fs = require("fs");
 
@@ -45,9 +46,10 @@ db.exec(`
 
 const adminExists = db.prepare("SELECT id FROM users WHERE role = 'admin'").get();
 if (!adminExists) {
-  db.prepare("INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)").run("admin", "admin@tickets.local", "admin123", "admin");
-  db.prepare("INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)").run("alice", "alice@example.com", "alice123", "user");
-  db.prepare("INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)").run("bob", "bob@example.com", "bob123", "user");
+  const insert = db.prepare("INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)");
+  insert.run("admin", "admin@tickets.local", bcrypt.hashSync("admin123", 12), "admin");
+  insert.run("alice", "alice@example.com",   bcrypt.hashSync("alice123", 12), "user");
+  insert.run("bob",   "bob@example.com",     bcrypt.hashSync("bob123",   12), "user");
   db.prepare("INSERT INTO tickets (title, description, status, priority, user_id) VALUES (?, ?, ?, ?, ?)").run("Problème de connexion", "Je ne peux pas me connecter depuis ce matin.", "open", "high", 2);
   db.prepare("INSERT INTO tickets (title, description, status, priority, user_id) VALUES (?, ?, ?, ?, ?)").run("Mot de passe oublié", "J'ai perdu mon mot de passe, pouvez-vous le réinitialiser ?", "open", "medium", 3);
   db.prepare("INSERT INTO tickets (title, description, status, priority, user_id) VALUES (?, ?, ?, ?, ?)").run("Facture incorrecte", "La facture du mois dernier contient une erreur de 50€.", "in_progress", "high", 2);

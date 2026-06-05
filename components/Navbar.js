@@ -24,11 +24,12 @@ export default function Navbar() {
       <div className="flex items-center gap-6">
         <Link href="/dashboard" className="font-bold text-blue-600 text-lg">TicketApp</Link>
         <Link href="/dashboard" className="text-sm text-gray-600 hover:text-gray-900">Mes tickets</Link>
+        <Link href="/profile" className="text-sm text-gray-600 hover:text-gray-900">Mon profil</Link>
         {user?.role === "admin" && (
           <>
             <Link href="/admin" className="text-sm text-gray-600 hover:text-gray-900">Admin</Link>
             <Link href="/admin/users" className="text-sm text-gray-600 hover:text-gray-900">Utilisateurs</Link>
-            <Link href="/admin/ssrf" className="text-sm text-red-500 hover:text-red-700">Test Webhook</Link>
+            <Link href="/admin/ssrf" className="text-sm text-gray-600 hover:text-gray-900">Webhooks</Link>
           </>
         )}
       </div>

@@ -22,7 +22,7 @@ export default function RegisterPage() {
       return;
     }
 
-    localStorage.setItem("token", data.token);
+    // FIX: token dans cookie httpOnly uniquement — pas en localStorage
     localStorage.setItem("user", JSON.stringify(data.user));
     router.push("/dashboard");
   }

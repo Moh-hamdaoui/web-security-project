@@ -6,8 +6,8 @@ export default function HomePage() {
       <div className="text-center">
         <h1 className="text-4xl font-bold text-gray-900 mb-2">TicketApp</h1>
         <p className="text-gray-500 text-lg">Système de gestion de tickets support</p>
-        <div className="mt-2 inline-block bg-red-100 text-red-700 text-xs px-3 py-1 rounded-full font-mono">
-          ⚠️ Version intentionnellement vulnérable — usage pédagogique uniquement
+        <div className="mt-2 inline-block bg-green-100 text-green-700 text-xs px-3 py-1 rounded-full font-mono">
+          ✓ Version sécurisée
         </div>
       </div>
 
@@ -26,14 +26,6 @@ export default function HomePage() {
         </Link>
       </div>
 
-      <div className="mt-8 max-w-lg w-full bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-        <h2 className="font-semibold text-yellow-800 mb-2">Comptes de test</h2>
-        <div className="space-y-1 text-sm font-mono text-yellow-900">
-          <div>admin@tickets.local / admin123 (role: admin)</div>
-          <div>alice@example.com / alice123 (role: user)</div>
-          <div>bob@example.com / bob123 (role: user)</div>
-        </div>
-      </div>
     </main>
   );
 }

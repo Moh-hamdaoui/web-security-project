@@ -24,12 +24,12 @@ export default function LoginPage() {
     setLoading(false);
 
     if (!res.ok) {
-      // ⚠️  VULN: Affiche la stack trace renvoyée par le serveur directement dans l'UI
-      setError(data.stack || data.error);
+      setError(data.error);
       return;
     }
 
-    localStorage.setItem("token", data.token);
+    // FIX: token dans cookie httpOnly uniquement — pas en localStorage (vulnérable au XSS)
+    // Seul l'objet user (non sensible) est stocké côté client pour l'UI
     localStorage.setItem("user", JSON.stringify(data.user));
 
     if (data.user.role === "admin") {
@@ -44,15 +44,11 @@ export default function LoginPage() {
       <div className="w-full max-w-md bg-white rounded-xl shadow-sm border border-gray-200 p-8">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Connexion</h1>
 
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-xs text-red-700 font-mono">
-          ⚠️ SQLi: essayez email = <code>{"' OR '1'='1' --"}</code>
-        </div>
-
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
             <input
-              type="text"
+              type="email"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
@@ -70,9 +66,7 @@ export default function LoginPage() {
           </div>
 
           {error && (
-            <pre className="text-xs text-red-600 bg-red-50 p-3 rounded overflow-auto max-h-40">
-              {error}
-            </pre>
+            <p className="text-sm text-red-600 bg-red-50 p-3 rounded">{error}</p>
           )}
 
           <button

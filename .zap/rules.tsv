@@ -1,0 +1,4 @@
+10049	IGNORE	(Non-Storable Content — Cache-Control sur assets statiques Next.js, comportement normal)
+90005	IGNORE	(Sec-Fetch-Dest Header Missing — header émis par le navigateur, pas par le serveur)
+10019	IGNORE	(Content-Type Missing on redirects — 307 sur robots.txt/sitemap.xml générés par Next.js)
+10055	IGNORE	(CSP unsafe-inline — requis par Next.js 14 pour ses scripts de runtime RSC. Mitigation : nonce-based CSP planifié avec Next.js 15)

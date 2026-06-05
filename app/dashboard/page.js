@@ -43,10 +43,7 @@ export default function DashboardPage() {
       <main className="max-w-4xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Tous les tickets</h1>
-            <p className="text-sm text-red-500 mt-1">
-              ⚠️ IDOR: vous voyez les tickets de TOUS les utilisateurs
-            </p>
+            <h1 className="text-2xl font-bold text-gray-900">Mes tickets</h1>
           </div>
           <Link
             href="/tickets/new"

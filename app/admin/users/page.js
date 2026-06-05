@@ -31,10 +31,7 @@ export default function AdminUsersPage() {
     <div className="min-h-screen bg-gray-50">
       <Navbar />
       <main className="max-w-4xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Gestion des utilisateurs</h1>
-        <p className="text-sm text-red-500 mb-6">
-          ⚠️ Les mots de passe sont stockés et affichés en clair (CWE-256)
-        </p>
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">Gestion des utilisateurs</h1>
 
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <table className="w-full text-sm">
@@ -43,7 +40,6 @@ export default function AdminUsersPage() {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Username</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-red-500 uppercase">Mot de passe ⚠️</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rôle</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
               </tr>
@@ -54,7 +50,6 @@ export default function AdminUsersPage() {
                   <td className="px-4 py-3 font-mono text-gray-400">{u.id}</td>
                   <td className="px-4 py-3 font-medium">{u.username}</td>
                   <td className="px-4 py-3 text-gray-600">{u.email}</td>
-                  <td className="px-4 py-3 font-mono text-red-600">{u.password}</td>
                   <td className="px-4 py-3">
                     <span className={`text-xs px-2 py-0.5 rounded-full ${u.role === "admin" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"}`}>
                       {u.role}

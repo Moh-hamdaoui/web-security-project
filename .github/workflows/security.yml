@@ -1,174 +1,104 @@
-name: Security Pipeline
+name: Security CI
 
 on:
   push:
-    branches: [main, develop]
+    branches:
+      - main
+      - secure-version
   pull_request:
-    branches: [main]
 
 jobs:
-  # ─────────────────────────────────────────
-  # 1. Audit des dépendances npm
-  # ─────────────────────────────────────────
-  dependency-audit:
-    name: Dependency Audit (npm audit)
+  security:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run npm audit
-        run: npm audit --audit-level=moderate
-        continue-on-error: true  # La version vulnérable a des vulns connues
-
-      - name: Generate audit report
-        run: npm audit --json > npm-audit-report.json || true
-
-      - name: Upload audit report
-        uses: actions/upload-artifact@v4
-        with:
-          name: npm-audit-report
-          path: npm-audit-report.json
-
-  # ─────────────────────────────────────────
-  # 2. Analyse statique avec Semgrep
-  # ─────────────────────────────────────────
-  semgrep:
-    name: SAST — Semgrep
-    runs-on: ubuntu-latest
-    container:
-      image: semgrep/semgrep
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Run Semgrep (OWASP Top 10)
-        run: |
-          semgrep scan \
-            --config "p/owasp-top-ten" \
-            --config "p/javascript" \
-            --config "p/nodejs" \
-            --config "p/jwt" \
-            --json \
-            --output semgrep-results.json \
-            . || true
-
-      - name: Run Semgrep (SQLi)
-        run: |
-          semgrep scan \
-            --config "p/sql-injection" \
-            --json \
-            --output semgrep-sqli.json \
-            . || true
-
-      - name: Display findings summary
-        run: |
-          echo "=== Semgrep Findings ==="
-          cat semgrep-results.json | python3 -c "
-          import json, sys
-          data = json.load(sys.stdin)
-          results = data.get('results', [])
-          print(f'Total findings: {len(results)}')
-          for r in results[:10]:
-              print(f'  [{r[\"extra\"][\"severity\"]}] {r[\"check_id\"]} — {r[\"path\"]}:{r[\"start\"][\"line\"]}')
-          " || true
-
-      - name: Upload Semgrep results
-        uses: actions/upload-artifact@v4
-        with:
-          name: semgrep-results
-          path: |
-            semgrep-results.json
-            semgrep-sqli.json
-
-  # ─────────────────────────────────────────
-  # 3. Détection de secrets (Gitleaks)
-  # ─────────────────────────────────────────
-  secret-scan:
-    name: Secret Detection — Gitleaks
-    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Run Gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
-        continue-on-error: true  # ⚠️  .env commité → détection attendue
-
-  # ─────────────────────────────────────────
-  # 4. Analyse des headers HTTP (pour version corrigée)
-  # ─────────────────────────────────────────
-  security-headers:
-    name: Security Headers Check
-    runs-on: ubuntu-latest
-    needs: []
-    steps:
-      - uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "npm"
 
+      # ── 1. Install dependencies ────────────────────────────────────────────
       - name: Install dependencies
         run: npm ci
 
+      # ── 2. SCA — npm audit ────────────────────────────────────────────────
+      # Niveau : critical uniquement.
+      # Les CVE "high" restants (Next.js 14.2.x) nécessitent Next.js 16 (breaking change).
+      # Ils sont documentés comme risques acceptés dans .audit-exceptions.md
+      # et atténués par notre configuration (pas de remotePatterns, pas de rewrites, pas de i18n).
+      - name: SCA - npm audit (critical)
+        run: npm audit --audit-level=critical
+
+      # Rapport high séparé — informatif seulement, ne bloque pas le pipeline
+      - name: SCA - npm audit (high — informatif)
+        run: npm audit --audit-level=high || true
+
+      # ── 3. SAST — Semgrep ─────────────────────────────────────────────────
+      - name: SAST - Semgrep
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: >-
+            p/owasp-top-ten
+            p/javascript
+            p/nodejs
+            p/jwt
+            p/sql-injection
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+
+      # ── 4. Secret Scan — Gitleaks ─────────────────────────────────────────
+      - name: Secret Scan - Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+
+      # ── 5. Build ──────────────────────────────────────────────────────────
       - name: Build application
         run: npm run build
         env:
-          JWT_SECRET: ci-test-secret-not-real
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
           DATABASE_PATH: ./data/ci-test.db
 
-      - name: Start server and check headers
-        run: |
-          npm start &
-          sleep 5
-          echo "=== Checking security headers ==="
-          curl -s -I http://localhost:3000 | grep -E "(X-Frame-Options|Content-Security-Policy|X-Content-Type-Options|Strict-Transport-Security|Referrer-Policy)" || echo "MISSING security headers detected"
+      # ── 6. Init DB ────────────────────────────────────────────────────────
+      - name: Init test database
+        run: node scripts/init-db.js
         env:
-          JWT_SECRET: ci-test-secret-not-real
           DATABASE_PATH: ./data/ci-test.db
-        continue-on-error: true
 
-  # ─────────────────────────────────────────
-  # 5. Rapport de sécurité consolidé
-  # ─────────────────────────────────────────
-  security-report:
-    name: Security Report
-    runs-on: ubuntu-latest
-    needs: [dependency-audit, semgrep, secret-scan]
-    if: always()
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
+      # ── 7. Start app ──────────────────────────────────────────────────────
+      - name: Start app
+        run: npm start &
+        env:
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          DATABASE_PATH: ./data/ci-test.db
 
-      - name: Generate consolidated report
-        run: |
-          echo "# Security Report — TicketApp Vulnérable" > security-report.md
-          echo "Date: $(date -u)" >> security-report.md
-          echo "" >> security-report.md
-          echo "## Résultats" >> security-report.md
-          echo "| Job | Statut |" >> security-report.md
-          echo "|-----|--------|" >> security-report.md
-          echo "| npm audit | ${{ needs.dependency-audit.result }} |" >> security-report.md
-          echo "| Semgrep SAST | ${{ needs.semgrep.result }} |" >> security-report.md
-          echo "| Gitleaks | ${{ needs.secret-scan.result }} |" >> security-report.md
-          cat security-report.md
+      # ── 8. Wait for app ───────────────────────────────────────────────────
+      - name: Wait for app
+        run: npx wait-on http://localhost:3000 --timeout 30000
 
-      - name: Upload consolidated report
-        uses: actions/upload-artifact@v4
+      # ── 9. DAST — OWASP ZAP ──────────────────────────────────────────────
+      # Corrige l'erreur de permission sur rules.tsv dans le container Docker
+      - name: Fix ZAP rules file permissions
+        run: chmod 644 .zap/rules.tsv
+
+      - name: DAST - OWASP ZAP
+        uses: zaproxy/action-baseline@v0.12.0
         with:
-          name: security-report
-          path: security-report.md
+          target: 'http://localhost:3000'
+          rules_file_name: '.zap/rules.tsv'
+          cmd_options: '-a'
+          fail_action: true
+
+      # ── 10. Upload rapports ───────────────────────────────────────────────
+      - name: Upload ZAP report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zap-report
+          path: report_html.html
