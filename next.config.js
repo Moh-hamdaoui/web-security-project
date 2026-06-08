@@ -39,6 +39,13 @@ const nextConfig = {
 
     return [
       {
+        // Fix ZAP [10049]: assets statiques Next.js doivent être cachés longtemps
+        source: "/_next/static/(.*)",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+        ],
+      },
+      {
         source: "/(.*)",
         headers: [
           // Anti-clickjacking
